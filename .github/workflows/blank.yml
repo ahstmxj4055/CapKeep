@@ -50,8 +50,9 @@ jobs:
             exit 1
           fi
           KEYSTORE_PATH="$RUNNER_TEMP/CapKeep-release.jks"
-          printf '%s' "$CAPKEEP_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          printf '%s' "$CAPKEEP_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$KEYSTORE_PATH"
           test -s "$KEYSTORE_PATH"
+          keytool -list -keystore "$KEYSTORE_PATH" -storepass "$CAPKEEP_KEYSTORE_PASSWORD" > /dev/null
           echo "path=$KEYSTORE_PATH" >> "$GITHUB_OUTPUT"
       - name: Build signed Android APK
         env:
