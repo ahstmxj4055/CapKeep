@@ -1,4 +1,4 @@
-name: Build CapKeep v0.1.0 APK
+name: Build CapKeep APK
 
 on:
   workflow_dispatch:
@@ -25,43 +25,43 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Find and build Android project
+      - name: Find latest project
+        id: project
         shell: bash
         run: |
-          SETTINGS_FILE=$(find . -type f -name "settings.gradle" -print -quit)
-
-          if [ -z "$SETTINGS_FILE" ]; then
-            ZIP_FILE=$(find . -type f -name "CapKeep*.zip" -print -quit)
-
-            if [ -n "$ZIP_FILE" ]; then
-              mkdir -p extracted_project
-              unzip -q "$ZIP_FILE" -d extracted_project
-              SETTINGS_FILE=$(find extracted_project -type f -name "settings.gradle" -print -quit)
-            fi
-          fi
+          SETTINGS_FILE=$(find . -type f -name "settings.gradle" | sort -V | tail -n 1)
 
           if [ -z "$SETTINGS_FILE" ]; then
             echo "settings.gradle 파일을 찾을 수 없습니다."
-            echo "CapKeep 프로젝트 파일 또는 ZIP이 저장소에 제대로 올라갔는지 확인하세요."
-            find . -maxdepth 3 -type f
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-          echo "프로젝트 위치: $PROJECT_DIR"
-          gradle -p "$PROJECT_DIR" assembleDebug
+          echo "최신 프로젝트 위치: $PROJECT_DIR"
+          echo "directory=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
-          APK_FILE=$(find "$PROJECT_DIR" -type f -path "*/outputs/apk/debug/*.apk" -print -quit)
+      - name: Build Android APK
+        shell: bash
+        run: |
+          gradle -p "${{ steps.project.outputs.directory }}" assembleDebug
+
+      - name: Find completed APK
+        shell: bash
+        run: |
+          APK_FILE=$(find "${{ steps.project.outputs.directory }}" \
+            -type f \
+            -path "*/outputs/apk/debug/*.apk" \
+            | head -n 1)
 
           if [ -z "$APK_FILE" ]; then
             echo "완성된 APK를 찾을 수 없습니다."
             exit 1
           fi
 
-          cp "$APK_FILE" CapKeep_v0.1.0-debug.apk
+          cp "$APK_FILE" CapKeep-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: CapKeep_v0.1.0-debug-APK
-          path: CapKeep_v0.1.0-debug.apk
+          name: CapKeep-debug-APK
+          path: CapKeep-debug.apk
