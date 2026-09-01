@@ -25,19 +25,36 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Find latest project
+      - name: Find or extract latest project
         id: project
         shell: bash
         run: |
           SETTINGS_FILE=$(find . -type f -name "settings.gradle" | sort -V | tail -n 1)
 
           if [ -z "$SETTINGS_FILE" ]; then
-            echo "settings.gradle 파일을 찾을 수 없습니다."
+            ZIP_FILE=$(find . -type f -iname "CapKeep*.zip" | sort -V | tail -n 1)
+
+            if [ -z "$ZIP_FILE" ]; then
+              echo "CapKeep 프로젝트 또는 ZIP 파일을 찾을 수 없습니다."
+              echo "저장소에 CapKeep ZIP 파일을 올려주세요."
+              find . -maxdepth 3 -type f
+              exit 1
+            fi
+
+            echo "ZIP 압축 해제: $ZIP_FILE"
+            mkdir -p extracted_capkeep
+            unzip -q -o "$ZIP_FILE" -d extracted_capkeep
+
+            SETTINGS_FILE=$(find extracted_capkeep -type f -name "settings.gradle" | sort -V | tail -n 1)
+          fi
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "ZIP 안에서 settings.gradle을 찾지 못했습니다."
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$SETTINGS_FILE")
-          echo "최신 프로젝트 위치: $PROJECT_DIR"
+          echo "프로젝트 위치: $PROJECT_DIR"
           echo "directory=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
 
       - name: Build Android APK
@@ -45,7 +62,7 @@ jobs:
         run: |
           gradle -p "${{ steps.project.outputs.directory }}" assembleDebug
 
-      - name: Find completed APK
+      - name: Prepare completed APK
         shell: bash
         run: |
           APK_FILE=$(find "${{ steps.project.outputs.directory }}" \
