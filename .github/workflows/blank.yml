@@ -25,12 +25,40 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Build Android APK
-        working-directory: CapKeep_v0.1.0
-        run: gradle assembleDebug
+      - name: Find and build Android project
+        shell: bash
+        run: |
+          SETTINGS_FILE=$(find . -type f -name "settings.gradle" -print -quit)
 
-      - name: Prepare APK artifact
-        run: cp CapKeep_v0.1.0/app/build/outputs/apk/debug/app-debug.apk CapKeep_v0.1.0-debug.apk
+          if [ -z "$SETTINGS_FILE" ]; then
+            ZIP_FILE=$(find . -type f -name "CapKeep*.zip" -print -quit)
+
+            if [ -n "$ZIP_FILE" ]; then
+              mkdir -p extracted_project
+              unzip -q "$ZIP_FILE" -d extracted_project
+              SETTINGS_FILE=$(find extracted_project -type f -name "settings.gradle" -print -quit)
+            fi
+          fi
+
+          if [ -z "$SETTINGS_FILE" ]; then
+            echo "settings.gradle 파일을 찾을 수 없습니다."
+            echo "CapKeep 프로젝트 파일 또는 ZIP이 저장소에 제대로 올라갔는지 확인하세요."
+            find . -maxdepth 3 -type f
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS_FILE")
+          echo "프로젝트 위치: $PROJECT_DIR"
+          gradle -p "$PROJECT_DIR" assembleDebug
+
+          APK_FILE=$(find "$PROJECT_DIR" -type f -path "*/outputs/apk/debug/*.apk" -print -quit)
+
+          if [ -z "$APK_FILE" ]; then
+            echo "완성된 APK를 찾을 수 없습니다."
+            exit 1
+          fi
+
+          cp "$APK_FILE" CapKeep_v0.1.0-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
